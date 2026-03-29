@@ -28,11 +28,11 @@ except ImportError:
 
 # --- Configurazione MusicBrainz ---
 musicbrainzngs.set_useragent(
-    app="CD-Ripper-FLAC", version="2.0", contact="https://github.com/elgraz"
+    app="Rippy", version="1.1", contact="https://codeberg.org/gpz/rippy"
 )
 
 # --- Directory di output base ---
-OUTPUT_DIR = Path("./ripped")
+OUTPUT_DIR = Path("./")
 CDPARANOIA = shutil.which("cdparanoia")
 SPINNER_FRAMES = ["◐◓◑◒", "⣾⣽⣻⢿⡿⣟⣯⣷", "▏▎▍▌▋▊▉█▉▊▌▍▎▏", ".oO0Oo.", "·∘○◉○∘·"]
 
@@ -57,7 +57,7 @@ def print_error(message: str):
 
 def print_success(message: str):
     """Print a success message."""
-    print(f"\n{GREEN}✔{RESET} {message}")
+    print(f"\n{GREEN} {message}{RESET}")
 
 
 def print_warning(message: str):
@@ -77,11 +77,6 @@ def dependency_check():
     if missing:
         print_error(f"Tools not found: {', '.join(missing)}")
         sys.exit(1)
-
-
-# ---------------------------------------------------------------------------
-# Lettura disco e MusicBrainz
-# ---------------------------------------------------------------------------
 
 
 def read_discid(device: str = "/dev/sr0") -> discid.Disc:
@@ -108,10 +103,10 @@ def musicbrainz_search(disc: discid.Disc) -> dict | None:
         if "404" in str(e):
             print_warning("No results found on MusicBrainz for this Disc ID.")
         else:
-            print_error(f"Errore nella risposta MusicBrainz: {e}")
+            print_error(f"MusicBrainz response error: {e}")
         return None
     except musicbrainzngs.NetworkError as e:
-        print_error(f"Errore di rete: {e}")
+        print_error(f"Network error: {e}")
         return None
 
 
@@ -134,6 +129,7 @@ def print_disc_info(disc: discid.Disc) -> None:
 
 def extract_tracks(release: dict) -> list[dict]:
     """Extracts track metadata from a MusicBrainz release."""
+
     artists = [
         a["artist"].get("name", "")
         for a in release.get("artist-credit", [])
@@ -141,12 +137,12 @@ def extract_tracks(release: dict) -> list[dict]:
     ]
     album_artist = ", ".join(artists) or "Unknown"
     album = release.get("title", "Unknown Album")
-    anno = release.get("date", "")[:4]
+    date = release.get("date", "")
 
     tracks = []
     for medium in release.get("medium-list", []):
         track_list = medium.get("track-list", [])
-        totale = len(track_list)
+        tracks_len = len(track_list)
         for track in track_list:
             num = track.get("number", str(len(tracks) + 1))
             recording = track.get("recording", {})
@@ -160,25 +156,32 @@ def extract_tracks(release: dict) -> list[dict]:
             ]
             track_artist = ", ".join(track_artist) or album_artist
 
-            tracks.append(
-                {
-                    "num": int(num) if str(num).isdigit() else len(tracks) + 1,
-                    "title": title,
-                    "artist": track_artist,
-                    "album_artist": album_artist,
-                    "album": album,
-                    "year": anno,
-                    "total": totale,
-                    "mbid": recording.get("id", ""),
-                }
-            )
+            meta = {
+                "TRACKNUMBER": int(num) if str(num).isdigit() else len(tracks) + 1,
+                "TITLE": title,
+                "ARTIST": track_artist,
+                "ALBUM_ARTIST": album_artist,
+                "ALBUM": album,
+                "DATE": date,
+                "TRACKTOTAL": tracks_len,
+                "BARCODE": release.get("barcode"),
+                "ASIN": release.get("asin"),
+                "MUSICBRAINZ_ALBUMID": release.get("id"),
+                "MUSICBRAINZ_RELEASEGROUPID": release.get("release-group", {}).get(
+                    "id"
+                ),
+                "MEDIA": medium.get("format"),
+                "RELEASESTATUS": release.get("status"),
+                "RELEASEPACKAGING": release.get("packaging"),
+                "RELEASECOUNTRY": release.get("country"),
+                "LANGUAGE": release.get("text-representation", {}).get("language"),
+                "MUSICBRAINZ_TRACKID": track.get("recording", {}).get("id"),
+            }
+            # Remove any empty fields
+            meta = {k: v for k, v in meta.items() if v}
+            tracks.append(meta)
 
     return tracks
-
-
-# ---------------------------------------------------------------------------
-# Selezione release interattiva
-# ---------------------------------------------------------------------------
 
 
 def select_release(releases: list[dict]) -> dict:
@@ -188,16 +191,17 @@ def select_release(releases: list[dict]) -> dict:
 
     print(f"\n  Multiple ({len(releases)}) releases found. \n Select the one to use:\n")
     for i, r in enumerate(releases, 1):
-        nomi = [
+        names = [
             a["artist"]["name"]
             for a in r.get("artist-credit", [])
             if isinstance(a, dict) and "artist" in a
         ]
-        artist = ", ".join(nomi) or "?"
+        artist = ", ".join(names) or "?"
         title = r.get("title", "?")
-        data = r.get("date", "?")[:4]
+        date = r.get("date", "?")[:4]
         cc = r.get("country", "?")
-        print(f"  [{i}] {artist} — {title} ({data}, {cc})")
+        bar = r.get("barcode", "?")
+        print(f"  [{i}] {artist} — {title} ({date}, {cc}, {bar})")
 
     while True:
         try:
@@ -207,11 +211,6 @@ def select_release(releases: list[dict]) -> dict:
         except (ValueError, KeyboardInterrupt):
             pass
         print_warning(f"Please select a number between 1 and {len(releases)}")
-
-
-# ---------------------------------------------------------------------------
-# Ripping con cdparanoia
-# ---------------------------------------------------------------------------
 
 
 def rip_track(num_traccia: int, wav_path: Path, device: str = "/dev/sr0") -> bool:
@@ -249,41 +248,27 @@ def rip_track(num_traccia: int, wav_path: Path, device: str = "/dev/sr0") -> boo
     process.wait()
 
     if process.returncode != 0:
-        print_error("FALLITA")
+        print_error("CD track dump failed")
         return False
-    print_success("✅ OK")
+    print_success("💿 CD track dump completed")
     return True
-
-
-# ---------------------------------------------------------------------------
-# Encoding FLAC
-# ---------------------------------------------------------------------------
 
 
 def encode_flac(wav_path: Path, flac_path: Path, meta: dict) -> bool:
     """
-    Codifica WAV → FLAC con tag Vorbis completi.
-    Ritorna True se riuscito.
+    Encodes WAV to FLAC with tags.
     """
+    tag_flags = []
+    for tag, value in meta.items():
+        if value:
+            tag_flags.append(f"--tag={tag}={value}")
+
     print(f"\n 🎵 FLAC encoding → {flac_path.name}...", flush=True)
-
-    tags = [
-        f"--tag=TITLE={meta.get('title', '')}",
-        f"--tag=ARTIST={meta.get('artist', '')}",
-        f"--tag=ALBUMARTIST={meta.get('album_artist', '')}",
-        f"--tag=ALBUM={meta.get('album', '')}",
-        f"--tag=DATE={meta.get('year', '')}",
-        f"--tag=TRACKNUMBER={meta.get('num', '')}",
-        f"--tag=TRACKTOTAL={meta.get('total', '')}",
-    ]
-    if meta.get("mbid"):
-        tags.append(f"--tag=MUSICBRAINZ_TRACKID={meta['mbid']}")
-
     cmd = [
         "flac",
         "--best",  # c8
         "--silent",
-        *tags,
+        *tag_flags,
         "-o",
         str(flac_path),
         str(wav_path),
@@ -297,50 +282,44 @@ def encode_flac(wav_path: Path, flac_path: Path, meta: dict) -> bool:
             print(f"       {line}")
         return False
     size_mb = flac_path.stat().st_size / 1024 / 1024
-    print_success(f"OK ({size_mb:.1f} MB)")
+    print_success(f"Encoding complete (size: {size_mb:.1f} MB)")
     return True
 
 
-# ---------------------------------------------------------------------------
-# Pipeline principale di ripping
-# ---------------------------------------------------------------------------
-
-
-def rip_cd(tracce: list[dict], device: str = "/dev/sr0") -> None:
+def rip_cd(tracks: list[dict], device: str = "/dev/sr0") -> None:
     """For each track:
     1. Extract WAV with cdparanoia in a temporary folder
     2. Encode in FLAC with tags
     3. Delete the WAV
     """
-    if not tracce:
+    if not tracks:
         print_warning("No tracks found .")
         return
 
-    # Directory organizzata: ./ripped/Artista/Album/
-    meta0 = tracce[0]
+    # Default to: ./artist/album/
+    meta0 = tracks[0]
     out_dir = (
         OUTPUT_DIR
-        / sanitize_filename(meta0["artista_album"])
-        / sanitize_filename(meta0["album"])
+        / sanitize_filename(meta0["ARTIST"])
+        / sanitize_filename(meta0["ALBUM"])
     )
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"\n📁 Output in: {out_dir.resolve()}")
     print("=" * 60)
-    print(f"🚀 Ripping {len(tracce)} tracks from {device}\n")
+    print(f"🚀 Rip and encode of {len(tracks)} tracks from {device} starting...\n")
 
     success, errors = 0, 0
 
     with tempfile.TemporaryDirectory(prefix="cd_rip_") as tmpdir:
-        for meta in tracce:
-            num = meta["num"]
-            nome = f"{num:02d}-{sanitize_filename(meta['title'])}"
+        for meta in tracks:
+            num = meta["TRACKNUMBER"]
+            nome = f"{num:02d}-{sanitize_filename(meta['TITLE'])}"
             wav_p = Path(tmpdir) / f"{nome}.wav"
             flac_p = out_dir / f"{nome}.flac"
 
-            print(f"\n──> [{num:02d}/{len(tracce):02d}] {meta['title']}")
+            print(f'\nExtracting [{num:02d}/{len(tracks):02d}] "{meta["TITLE"]}"')
 
-            # Salta se FLAC già presente
             if flac_p.exists():
                 print(
                     f"    ⏭️  {GREEN}File {RESET}{CYAN}{flac_p.name}{RESET} {GREEN}already exists, skip!{RESET}"
@@ -348,25 +327,22 @@ def rip_cd(tracce: list[dict], device: str = "/dev/sr0") -> None:
                 success += 1
                 continue
 
-            # Rip → WAV
             if not rip_track(num, wav_p, device):
                 errors += 1
                 continue
 
-            # WAV → FLAC
             if encode_flac(wav_p, flac_p, meta):
                 success += 1
             else:
                 errors += 1
-            # wav_p eliminato automaticamente all'uscita dal context manager
 
-    # Riepilogo finale
+    # Recap
     print("\n" + "=" * 60)
     print("📊  Summary")
     print("=" * 60)
-    print_success(f"Completed : {success}/{len(tracce)} tracce")
+    print_success(f"Completed : {success}/{len(tracks)} tracce")
     if errors:
-        print_error(f"Errors     : {errors}/{len(tracce)} tracce")
+        print_error(f"Errors     : {errors}/{len(tracks)} tracce")
     print(f"  📁 File FLAC  : {out_dir.resolve()}")
     print("=" * 60)
 
@@ -386,7 +362,7 @@ def main():
 
     result = musicbrainz_search(disc)
 
-    tracce = []
+    tracks = []
 
     if result:
         print("\n" + "=" * 60)
@@ -403,7 +379,7 @@ def main():
 
         if releases:
             release = select_release(releases)
-            tracce = extract_tracks(release)
+            tracks = extract_tracks(release)
 
             names = [
                 a["artist"]["name"]
@@ -413,44 +389,42 @@ def main():
             print(f"\n  Artist : {', '.join(names)}")
             print(f"  Album   : {release.get('title', '?')}")
             print(f"  Year    : {release.get('date', '?')[:4]}")
-            print(f"  Tracks  : {len(tracce)}")
-            for t in tracce:
-                print(f"    {t['num']:>2}. {t['title']}")
+            print(f"  Tracks  : {len(tracks)}\n")
+            for t in tracks:
+                print(f"    {t['TRACKNUMBER']:>2}. {t['TITLE']}")
         else:
             print_warning(" No releases found on MusicBrainz.")
 
-    if not tracce:
+    if not tracks:
         # Fallback: crea tracce numeriche senza metadati
         print_warning("Proceeding without MusicBrainz metadata.")
         for i in range(1, disc.last_track_num + 1):
-            tracce.append(
+            tracks.append(
                 {
-                    "num": i,
-                    "title": f"Track {i:02d}",
-                    "artist": "Unknown Artist",
-                    "album_artist": "Unknown Artist",
-                    "album": "Unknown Album",
-                    "year": "",
-                    "total": disc.last_track_num,
-                    "mbid": "",
+                    "TRACKNUMBER": i,
+                    "TITLE": f"Track {i:02d}",
+                    "ARTIST": "Unknown Artist",
+                    "ALBUM_ARTIST": "Unknown Artist",
+                    "ALBUM": "Unknown Album",
+                    "TRACKTOTAL": disc.last_track_num,
                 }
             )
 
-    # 3. Conferma prima di avviare il ripping
     print()
     try:
-        resp = input("▶️  Ready to rip and encode to FLAC? [y/N] ").strip().lower()
+        resp = input("Ready to rip and encode to FLAC? [y/N] ").strip().lower()
     except KeyboardInterrupt:
         print("\nAborted.")
         return
 
-    if resp not in ("y", "s", "si", "yes"):
+    if resp not in ("y", "yes", "si", "s"):
         print("Operation aborted.")
         return
 
-    rip_cd(tracce, device)
+    rip_cd(tracks, device)
 
 
+# Unused in actual code, just for testing spinners :P
 def test_spinner(idx):
     spinner = itertools.cycle(SPINNER_FRAMES[idx])
 
