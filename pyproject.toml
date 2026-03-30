@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build-meta"
+
+[project]
+name = "rippy"
+version = "0.2.0"
+dependencies = [
+	"discid",
+	"musicbrainzngs"
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
