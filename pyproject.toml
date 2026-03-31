@@ -4,7 +4,10 @@ build-backend = "setuptools.build-meta"
 
 [project]
 name = "rippy"
-version = "0.2.0"
+version = "0.2.1"
+description = "CD MusicBrainz Lookup + Rip + FLAC Encoding"
+readme = "README.md"
+requires-python = ">=3.8"
 dependencies = [
 	"discid",
 	"musicbrainzngs"
@@ -12,3 +15,6 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest"]
+
+[project.scripts]
+rippy = "rippy.cli:main"

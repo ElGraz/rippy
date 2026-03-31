@@ -21,6 +21,7 @@ $(VENV)/bin/activate: pyproject.toml
 # 2. Run tests by manually injecting the library path
 # We set PYTHONPATH to the current directory so 'import lib' works.
 test: setup
+	$(PIP) install pytest
 	@echo "Running tests with PYTHONPATH injection..."
 	PYTHONPATH=. $(PYTEST) tests/
 
