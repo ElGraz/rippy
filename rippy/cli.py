@@ -3,9 +3,16 @@ import shutil
 import sys
 from pathlib import Path
 
-from .core import read_discid, print_disc_info, musicbrainz_search, select_release, extract_tracks
+from .core import (
+    extract_tracks,
+    musicbrainz_search,
+    print_disc_info,
+    read_discid,
+    select_release,
+)
 from .ripper import Ripper
 from .utils import print_warning
+
 
 def dependency_check() -> tuple[str, str]:
     """Check for dependencies: cdparanoia and flac."""
@@ -21,13 +28,31 @@ def dependency_check() -> tuple[str, str]:
 
     return cdparanoia_path, flac_path
 
+
 def main():
-    parser = argparse.ArgumentParser(description="CD MusicBrainz Lookup + Rip + FLAC Encoding")
-    parser.add_argument("device", nargs="?", default="/dev/sr0", help="CD device path (default: /dev/sr0)")
-    parser.add_argument("-o", "--output", default=".", help="Output directory (default: current directory)")
+    parser = argparse.ArgumentParser(
+        description="CD MusicBrainz Lookup + Rip + FLAC Encoding"
+    )
+    parser.add_argument(
+        "device",
+        nargs="?",
+        default="/dev/sr0",
+        help="CD device path (default: /dev/sr0)",
+    )
+    parser.add_argument(
+        "--device", "-d", help="CD device path (overrides positional argument)"
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        default=".",
+        help="Output directory (default: current directory)",
+    )
     parser.add_argument("--cdparanoia", help="Path to cdparanoia executable")
     parser.add_argument("--flac", help="Path to flac executable")
-    parser.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompt")
+    parser.add_argument(
+        "-y", "--yes", action="store_true", help="Skip confirmation prompt"
+    )
 
     args = parser.parse_args()
 
@@ -35,7 +60,12 @@ def main():
     cdparanoia_path = args.cdparanoia or cdparanoia_sys
     flac_path = args.flac or flac_sys
 
-    disc = read_discid(args.device)
+    # Use --device flag if provided, otherwise use positional device argument
+    device = "/dev/sr0"
+    if args.device:
+        device = args.device
+
+    disc = read_discid(device)
     print_disc_info(disc)
 
     result = musicbrainz_search(disc)
@@ -56,17 +86,16 @@ def main():
 
         if releases:
             release = select_release(releases)
-            tracks = extract_tracks(release)
+            tracks = extract_tracks(release, disc)
+            tr0 = tracks[0]
 
-            names = [
-                a["artist"]["name"]
-                for a in release.get("artist-credit", [])
-                if isinstance(a, dict) and "artist" in a
-            ]
-            print(f"\n  Artist : {', '.join(names)}")
-            print(f"  Album   : {release.get('title', '?')}")
-            print(f"  Year    : {release.get('date', '?')[:4]}")
+            print(f"\n  Artist : {tr0.get('ARTIST', '?')}")
+            print(f"  Album   : {tr0.get('ALBUM', '?')}")
+            print(f"  Year    : {tr0.get('DATE', '?')[:4]}")
+            if len(tracks) > 0 and tracks[0].get("DISCNUMBER"):
+                print(f"  Disc    : {tracks[0].get('DISCNUMBER', '?')}")
             print(f"  Tracks  : {len(tracks)}\n")
+
             for t in tracks:
                 print(f"    {t['TRACKNUMBER']:>2}. {t['TITLE']}")
         else:
@@ -89,7 +118,7 @@ def main():
     print()
     if not args.yes:
         try:
-            resp = input("Ready to rip and encode to FLAC? [y/N] ").strip().lower()
+            resp = input("Ready to rip? [y/N] ").strip().lower()
             if resp not in ("y", "yes", "si", "s"):
                 print("Operation aborted.")
                 return
@@ -98,12 +127,13 @@ def main():
             return
 
     ripper = Ripper(
-        device=args.device,
+        device=device,
         cdparanoia_path=cdparanoia_path,
         flac_path=flac_path,
-        output_dir=Path(args.output)
+        output_dir=Path(args.output),
     )
     ripper.rip_cd(tracks)
+
 
 if __name__ == "__main__":
     main()
