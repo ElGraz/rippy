@@ -1,29 +1,55 @@
 # Rippy!
 
-I like my phisical media, but is still more conveniet to have a digital copy at hand.
+I like my physical media, but it's still more convenient to have a digital copy at hand.
 Current available software for Linux is usually "too much" or "broken"/"too old".
-This should be easy, all you need is to glue together some simple CLIs, the Unix way. That sometimes is thedious, especially having to fill in metadata manually. 
+This should be easy — all you need is to glue together some simple CLIs, the Unix way. That sometimes is tedious, especially having to fill in metadata manually.
 
 So I made it simple: `Rippy`!
 
-Rippy dumps (rip) audio CD to Flac, adding track info from Muscibrainz. That's it. Simple and efficient CD Ripping.
+Rippy dumps (rips) audio CDs to FLAC, adding track info from MusicBrainz. That's it. Simple and efficient CD ripping.
 
-This script depends on the following:
+This tool depends on the following system libraries:
 
-- python3
-- cdparanoia
-- flac
+- libcdio (with paranoia support)
+- libdiscid
 
-To run just clone the repo and run `./rippy`.
-The script will setup the python env and start the ripping process.
+## Prerequisites
+
+Install the required system dependencies:
+
+```bash
+# Debian/Ubuntu
+sudo apt-get install libcdio-dev libcdio-paranoia-dev libdiscid-dev
+
+# Fedora
+sudo dnf install cdio-devel cdio-paranoia-devel libdiscid-devel
+
+# Arch
+sudo pacman -S libcdio paranoia libdiscid
+```
+
+## Running
+
+Clone the repo and run:
+
+```bash
+cargo run --release
+```
+
+Or build once and run directly:
+
+```bash
+cargo build --release
+./target/release/rippy
+```
 
 ## How it works
 
 Simple! 
 - First clone `rippy` code 😅
-- Insert a CD in your reader (default `/dev/sr0`) and run it with `./run.sh`. 
+- Insert a CD in your reader and run `cargo run`.
 
-Rippy will lookup your disk in the Musicbrainz database and, if needed, ask you to pick between similar disks:
+Rippy will lookup your disc in the MusicBrainz database and, if needed, ask you to pick between similar discs:
 
 ```
 🔍 Reading Disc ID from /dev/sr0 ...
@@ -65,7 +91,7 @@ Ready to rip and encode to FLAC? [y/N]
   ```
   
 Now, confirm and chill. Rippy will do the rest! 😀
-Tracks will be extracted and converted to Flac, automatically filling in all the evailable details into metatdata.
+Tracks will be extracted and converted to FLAC, automatically filling in all the available details into metadata.
 
 ```
 Extracting [01/05] "First"
@@ -96,8 +122,14 @@ Completed : 5/5 tracks
 
 Done!
 
+## Running tests
+
+```bash
+cargo test
+```
+
 ## Missing features
 
 This needs a good refactoring into a lib, better dependency handling.
 
-Even more than then it needs a config file of sort, to set default output dir and default file naming structure.
+Even more than that it needs a config file of sort, to set default output dir and default file naming structure.
