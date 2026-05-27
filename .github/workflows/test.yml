@@ -15,7 +15,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: apt install libcdio-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcdio-dev
 
       - name: Run tests
         run: cargo test
