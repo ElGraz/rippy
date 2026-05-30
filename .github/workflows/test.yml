@@ -28,13 +28,3 @@ jobs:
 
       - name: Run tests
         run: cargo test
-      
-      - name: Build release
-        run: cargo build --verbose --profile release
-
-      - name: Upload release artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: rippy
-          path: target/release/rippy
-          
