@@ -1,4 +1,4 @@
-# Rippy!
+# Rippy! [![Test](https://github.com/ElGraz/rippy/actions/workflows/test.yml/badge.svg)](https://github.com/ElGraz/rippy/actions/workflows/test.yml)
 
 I like my physical media, but sometimes it is convenient to have a digital copy at hand.
 
@@ -79,12 +79,6 @@ Or build once and run directly:
 ```bash
 cargo build --release
 ./target/release/rippy
-```
-
-### Testing
-
-```bash
-cargo test
 ```
 
 ## Future Enhancements
