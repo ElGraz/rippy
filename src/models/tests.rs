@@ -2,28 +2,28 @@ use super::{AlbumMetadata, TrackMetadata};
 
 #[test]
 fn track_metadata_default_values() {
+    let meta = TrackMetadata::default();
+
+    assert_eq!(meta.number, 0);
+    assert_eq!(meta.artist, "Unknown Artist");
+    assert_eq!(meta.album, "Unknown Album");
+    assert!(meta.disc_number.is_none());
+}
+
+#[test]
+fn track_metadata_custom_values() {
     let meta = TrackMetadata {
         number: 1,
         title: "Test Track".to_string(),
         artist: "Test Artist".to_string(),
         album: "Test Album".to_string(),
-        album_id: String::new(),
-        barcode: String::new(),
-        track_id: String::new(),
-        release_group_id: String::new(),
-        media_format: String::new(),
-        packaging: String::new(),
-        country: String::new(),
-        disc_number: Some(1),
-        date: String::new(),
-        release_status: String::new(),
+        ..TrackMetadata::default()
     };
 
     assert_eq!(meta.number, 1);
     assert_eq!(meta.title, "Test Track");
     assert_eq!(meta.artist, "Test Artist");
     assert_eq!(meta.album, "Test Album");
-    assert_eq!(meta.disc_number, Some(1));
 }
 
 #[test]
@@ -92,4 +92,30 @@ fn album_metadata_empty_tracks() {
     };
 
     assert!(meta.tracks.is_empty());
+}
+
+#[test]
+fn track_metadata_debug_output() {
+    let meta = TrackMetadata::default();
+    let debug_str = format!("{:?}", meta);
+    assert!(debug_str.contains("TrackMetadata"));
+}
+
+#[test]
+fn album_metadata_debug_output() {
+    let meta = AlbumMetadata {
+        title: "Test".into(),
+        artist: "Artist".into(),
+        album_id: String::new(),
+        barcode: String::new(),
+        release_group_id: String::new(),
+        media_format: String::new(),
+        packaging: String::new(),
+        country: String::new(),
+        tracks: vec![],
+        date: String::new(),
+        release_status: String::new(),
+    };
+    let debug_str = format!("{:?}", meta);
+    assert!(debug_str.contains("AlbumMetadata"));
 }

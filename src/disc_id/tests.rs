@@ -119,3 +119,19 @@ fn disc_id_with_realistic_offsets() {
     assert!(!disc_id.contains('/'));
     assert!(!disc_id.contains('='));
 }
+
+#[test]
+fn hash_input_format_with_single_track() {
+    // first_track=1, last_track=1, all offsets=0
+    let hash_input = format!(
+        "{:02X}{:02X}{}",
+        1u8,
+        1u8,
+        (0..100)
+            .map(|_| format!("{:08X}", 0i32))
+            .collect::<String>()
+    );
+
+    // The first 4 characters should be "0101" (first_track=01, last_track=01)
+    assert_eq!(&hash_input[0..4], "0101");
+}

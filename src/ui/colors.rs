@@ -14,3 +14,17 @@ macro_rules! status {
         println!("{}{}{}{} {}{}", $color, $crate::ui::colors::BOLD, $icon, $crate::ui::colors::RESET, format!($($arg)*), $crate::ui::colors::RESET)
     };
 }
+
+#[macro_export]
+macro_rules! error {
+    ($($arg:tt)*) => {
+        eprintln!(
+            "  {}{}ERROR:{} {}{}",
+            $crate::ui::colors::RED,
+            $crate::ui::colors::BOLD,
+            $crate::ui::colors::RESET,
+            format!($($arg)*),
+            $crate::ui::colors::RESET
+        )
+    };
+}
