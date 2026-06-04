@@ -1,3 +1,4 @@
+#[derive(Clone, Debug)]
 pub struct TrackMetadata {
     pub number: u32,
     pub title: String,
@@ -15,6 +16,28 @@ pub struct TrackMetadata {
     pub release_status: String,
 }
 
+impl Default for TrackMetadata {
+    fn default() -> Self {
+        Self {
+            number: 0,
+            title: String::new(),
+            artist: "Unknown Artist".into(),
+            album: "Unknown Album".into(),
+            album_id: String::new(),
+            barcode: String::new(),
+            track_id: String::new(),
+            release_group_id: String::new(),
+            media_format: String::new(),
+            packaging: String::new(),
+            country: String::new(),
+            disc_number: None,
+            date: String::new(),
+            release_status: String::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct AlbumMetadata {
     pub title: String,
     pub artist: String,

@@ -12,7 +12,7 @@ pub fn print_disc_summary(summary: &DiscSummary, disc_id: &str) {
     let width = 54usize;
     let bar = "─".repeat(width);
 
-    println!("  {}{}┌{}┐{}", BOLD, CYAN, bar, RESET);
+    println!("\n  {}{}┌{}┐{}", BOLD, CYAN, bar, RESET);
 
     println!(
         "  {}{}│{}  {}ID   {}{}{}{}",
@@ -70,4 +70,40 @@ fn print_row(label: &str, value: &str) {
 
 fn print_divider(width: usize) {
     println!("  {}{}├{}┤{}", BOLD, CYAN, "─".repeat(width), RESET);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn print_disc_summary_unknown_does_not_panic() {
+        let summary = DiscSummary {
+            album_title: None,
+            artist: None,
+            tracks: vec![],
+            total_tracks: 1,
+            unknown_disc: true,
+        };
+        let _ = std::panic::catch_unwind(|| {
+            print_disc_summary(&summary, "test-id");
+        });
+    }
+
+    #[test]
+    fn print_disc_summary_known_does_not_panic() {
+        let summary = DiscSummary {
+            album_title: Some("Test Album".to_string()),
+            artist: Some("Test Artist".to_string()),
+            tracks: vec![
+                ("Track 1".to_string(), "id-1".to_string()),
+                ("Track 2".to_string(), "id-2".to_string()),
+            ],
+            total_tracks: 2,
+            unknown_disc: false,
+        };
+        let _ = std::panic::catch_unwind(|| {
+            print_disc_summary(&summary, "test-id");
+        });
+    }
 }
