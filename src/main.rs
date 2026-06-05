@@ -110,21 +110,18 @@ fn select_album(albums: Vec<AlbumMetadata>) -> Result<Option<AlbumMetadata>> {
                 BOLD, RESET
             );
             for (i, album) in albums.iter().enumerate() {
-                let barcode = if album.barcode.is_empty() {
-                    "N/A".to_string()
-                } else {
-                    album.barcode.clone()
-                };
                 println!(
-                    "  {} [{}] {}{}{} (Barcode: {}{}){}",
+                    "  {} [{}] {}{}{} ({})\tBarcode: {}{}{}\t[{}]",
                     BOLD,
                     i + 1,
                     GREEN,
                     album.title,
                     RESET,
+                    album.country,
                     DIM,
-                    barcode,
-                    RESET
+                    album.barcode,
+                    RESET,
+                    album.packaging,
                 );
             }
             println!();
