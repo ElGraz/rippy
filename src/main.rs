@@ -2,31 +2,31 @@ mod cdio;
 mod disc_id;
 mod models;
 mod musicbrainz;
-mod path;
 mod ripper;
-mod signal;
 mod tags;
 mod ui;
+mod utils;
 
 use crate::models::{AlbumMetadata, TrackMetadata};
-use crate::ui::colors::{BOLD, CYAN, DIM, GREEN, RESET};
 use crate::ui::input;
 use anyhow::Result;
+use owo_colors::OwoColorize;
 
 const RIPPY_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
     println!();
     print!(
-        "  {}{} >> Rippy! << {}CDDA to FLAC ripper (v{}) {}\n\n",
-        BOLD, CYAN, DIM, RIPPY_VERSION, RESET
+        "  {}\n  {}\n\n",
+        "─── Rippy! ───".cyan().bold(),
+        format!("CDDA to FLAC ripper [v{}]", RIPPY_VERSION).dimmed()
     );
 
     let drive = match cdio::CdDrive::new() {
         Some(d) => d,
         None => print_error_and_exit("No CD drive found. Is the drive connected?"),
     };
-    println!("  {}Reading from {}{}", DIM, drive.get_path(), RESET);
+    println!("  {} {}", "Reading from".dimmed(), drive.get_path());
 
     let mut device = cdio::CdDevice::from_drive(drive);
     let total_tracks = match device.track_count() {
@@ -35,13 +35,9 @@ fn main() {
     };
     let first_track: u32 = 1;
 
-    status!(
-        "✓",
-        GREEN,
-        "Drive ready — {}{}{} audio track{} detected",
-        BOLD,
-        total_tracks,
-        RESET,
+    status_ok!(
+        "Drive ready — {} audio track{} detected",
+        total_tracks.to_string().cyan().bold(),
         if total_tracks == 1 { "" } else { "s" }
     );
 
@@ -49,7 +45,7 @@ fn main() {
         Ok(id) => id,
         Err(e) => print_error_and_exit(&e.to_string()),
     };
-    println!("  {}{}ID:{} {}{}{}", DIM, BOLD, RESET, DIM, disc_id, RESET);
+    println!("  ID: {}", disc_id.bold().dimmed());
 
     let albums = match musicbrainz::fetch_album_metadata(&disc_id) {
         Ok(albums) => albums,
@@ -61,38 +57,27 @@ fn main() {
         Err(e) => print_error_and_exit(&e.to_string()),
     };
 
-    let summary = ui::summary::DiscSummary {
-        album_title: metadata.as_ref().map(|m| m.title.clone()),
-        artist: metadata.as_ref().map(|m| m.artist.clone()),
-        tracks: metadata
-            .as_ref()
-            .map(|m| m.tracks.clone())
-            .unwrap_or_default(),
-        total_tracks,
-        unknown_disc: metadata.is_none(),
-    };
-    ui::summary::print_disc_summary(&summary, &disc_id);
+    let summary = metadata.as_ref().cloned().unwrap_or_default();
+    ui::summary::print_disc_summary(&summary, total_tracks, &disc_id);
     println!();
 
-    if !input::confirm("Proceed with ripping").unwrap_or(false) {
-        println!("\n  {}Aborted.", DIM);
-        return;
+    if !input::confirm("Ready to rip?").unwrap_or(false) {
+        abort();
     }
     println!();
 
     // Initialize Ctrl+C handler before starting the long-running rip process.
-    signal::init_handler();
+    utils::signal::init_handler();
 
-    match rip_tracks(&mut device, first_track, total_tracks, &metadata) {
-        Ok(()) => status!(
-            "✓",
-            GREEN,
+    let rip_metadata = metadata.unwrap_or_default();
+    match rip_tracks(&mut device, first_track, total_tracks, &rip_metadata) {
+        Ok(()) => status_ok!(
             "All {} track{} ripped successfully.",
             total_tracks,
             if total_tracks == 1 { "" } else { "s" }
         ),
         Err(e) if e.to_string().contains("User interrupted") => {
-            println!("\n  {}Aborted.", DIM);
+            abort();
         }
         Err(e) => print_error_and_exit(&e.to_string()),
     }
@@ -105,23 +90,15 @@ fn select_album(albums: Vec<AlbumMetadata>) -> Result<Option<AlbumMetadata>> {
         1 => Ok(Some(albums.into_iter().next().unwrap())),
         _ => {
             println!();
-            println!(
-                "  {}Multiple releases found. Please select one:{}",
-                BOLD, RESET
-            );
+            println!("{}", "  Multiple releases found. Please select one:".bold());
             for (i, album) in albums.iter().enumerate() {
                 println!(
-                    "  {} [{}] {}{}{} ({})\tBarcode: {}{}{}\t[{}]",
-                    BOLD,
-                    i + 1,
-                    GREEN,
-                    album.title,
-                    RESET,
-                    album.country,
-                    DIM,
-                    album.barcode,
-                    RESET,
-                    album.packaging,
+                    "  {num} {title} ({country})\tBarcode: {barcode}\t{packaging}",
+                    num = format!("[{}]", i + 1).bold(),
+                    title = album.title.green(),
+                    country = album.country,
+                    barcode = album.barcode.dimmed(),
+                    packaging = album.packaging,
                 );
             }
             println!();
@@ -137,53 +114,22 @@ fn rip_tracks(
     device: &mut cdio::CdDevice,
     first_track: u32,
     total_tracks: u32,
-    metadata: &Option<AlbumMetadata>,
+    metadata: &AlbumMetadata,
 ) -> Result<()> {
     for track_idx in first_track..first_track + total_tracks {
-        let track_meta = resolve_track_metadata(track_idx, first_track, metadata);
-        ripper::rip_and_encode_track(device, track_idx, total_tracks, &track_meta)?;
+        let track_meta = TrackMetadata::from_album(track_idx, first_track, metadata);
+        ripper::rip_and_encode_track(device, track_idx, total_tracks, &track_meta, metadata)?;
     }
     Ok(())
 }
 
-/// Resolve per-track metadata from the album info, falling back to defaults.
-fn resolve_track_metadata(
-    track_idx: u32,
-    first_track: u32,
-    album_meta: &Option<AlbumMetadata>,
-) -> TrackMetadata {
-    let mut meta = TrackMetadata::default();
-    meta.number = track_idx;
-    meta.title = format!("Track {}", track_idx);
-
-    if let Some(album) = album_meta {
-        meta.artist.clone_from(&album.artist);
-        meta.album.clone_from(&album.title);
-        meta.album_id.clone_from(&album.album_id);
-        meta.barcode.clone_from(&album.barcode);
-        meta.release_group_id.clone_from(&album.release_group_id);
-        meta.media_format.clone_from(&album.media_format);
-        meta.packaging.clone_from(&album.packaging);
-        meta.country.clone_from(&album.country);
-        meta.disc_number = Some(track_idx);
-        meta.date.clone_from(&album.date);
-        meta.release_status.clone_from(&album.release_status);
-
-        if let Some((title, track_id)) = album
-            .tracks
-            .get((track_idx - first_track) as usize)
-            .cloned()
-        {
-            meta.title = title;
-            meta.track_id = track_id;
-        }
-    }
-
-    meta
-}
-
 /// Print a bold red error message and exit with a non-zero status.
 fn print_error_and_exit(message: &str) -> ! {
-    error!("{}", message);
+    status_err!("{}", message);
+    std::process::exit(1);
+}
+
+fn abort() -> ! {
+    status!("!", yellow, "Aborted.");
     std::process::exit(1);
 }

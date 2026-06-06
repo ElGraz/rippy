@@ -1,6 +1,7 @@
 use anyhow::Result;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use sha1::{Digest, Sha1};
+use std::fmt::Write;
 
 use crate::cdio::CdDevice;
 
@@ -26,9 +27,11 @@ pub fn compute(device: &mut CdDevice, first_track: u32, total_tracks: u32) -> Re
     }
 
     // Hash input: first_track(2) + last_track(2) + 100 offset slots (each 8), all uppercase hex.
-    let mut hash_input = format!("{:02X}{:02X}", first_track, last_track);
+    // Pre-allocate capacity: 2 + 2 + (100 * 8) = 804 chars.
+    let mut hash_input = String::with_capacity(804);
+    write!(hash_input, "{:02X}{:02X}", first_track, last_track).unwrap();
     for &offset in &offsets {
-        hash_input.push_str(&format!("{:08X}", offset));
+        write!(hash_input, "{:08X}", offset).unwrap();
     }
 
     // SHA-1 → standard Base64, then MusicBrainz substitutions: + → .  / → _  = → -

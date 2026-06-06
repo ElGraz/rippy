@@ -4,12 +4,13 @@ use libcdio_sys::{cdio_paranoia_read, cdio_paranoia_seek};
 use std::io::Write;
 
 use crate::cdio::CdDevice;
+use crate::models::AlbumMetadata;
 use crate::models::TrackMetadata;
-use crate::path;
-use crate::signal;
 use crate::tags;
-use crate::ui::colors::RESET;
 use crate::ui::progress;
+use crate::utils::path;
+use crate::utils::signal;
+use owo_colors::OwoColorize;
 
 const SAMPLES_PER_SECTOR: usize = 1176;
 
@@ -18,13 +19,23 @@ pub fn rip_and_encode_track(
     track_num: u32,
     total_tracks: u32,
     meta: &TrackMetadata,
+    album: &AlbumMetadata,
 ) -> Result<()> {
     use std::path::Path;
 
     let artist_dir = path::sanitize(&meta.artist);
     let album_dir = path::sanitize(&meta.album);
-    let dir = Path::new(&artist_dir).join(&album_dir);
-    std::fs::create_dir_all(&dir)?;
+    let dir;
+    if album.disc_count > 1 {
+        dir = Path::new(&artist_dir)
+            .join(&album_dir)
+            .join(format!("Disc_{}", album.disc_number));
+    } else {
+        dir = Path::new(&artist_dir).join(&album_dir);
+    }
+    if !dir.exists() {
+        std::fs::create_dir_all(&dir)?;
+    }
 
     let filename = format!("{:02} - {}.flac", meta.number, path::sanitize(&meta.title));
     let output_path = dir.join(filename);
@@ -32,7 +43,7 @@ pub fn rip_and_encode_track(
     progress::print_track_header(track_num, total_tracks, &meta.title);
 
     // Build Vorbis comment metadata blocks.
-    let comments = tags::build_comments(meta, total_tracks);
+    let comments = tags::build_comments(&album, meta, total_tracks);
 
     let file = std::fs::File::create(&output_path)?;
     let writer = std::io::BufWriter::new(file);
@@ -53,9 +64,8 @@ pub fn rip_and_encode_track(
         // Check for Ctrl+C interrupt before reading each sector.
         if signal::is_interrupted() {
             print!(
-                "\r  {}Do you want to stop the rip process and quit?{} [y/N] ",
-                crate::ui::colors::DIM,
-                RESET,
+                "\r  {}",
+                "Do you want to stop the rip process and quit? [y/N]".bold()
             );
             std::io::stdout().flush()?;
 

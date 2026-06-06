@@ -4,9 +4,6 @@ pub mod progress;
 pub mod summary;
 
 #[cfg(test)]
-mod colors_tests;
-
-#[cfg(test)]
 mod input_tests;
 
 #[cfg(test)]

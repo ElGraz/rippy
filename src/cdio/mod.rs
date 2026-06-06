@@ -30,6 +30,17 @@ impl CdDrive {
     }
 }
 
+impl Drop for CdDrive {
+    fn drop(&mut self) {
+        unsafe {
+            // Only close if it hasn't been moved into a CdDevice
+            if !self.drive.is_null() {
+                cdio_cddap_close(self.drive);
+            }
+        }
+    }
+}
+
 /// Represents an initialized CD drive with paranoia support.
 /// Implements `Drop` to ensure resources are always cleaned up.
 pub struct CdDevice {
@@ -40,10 +51,12 @@ pub struct CdDevice {
 
 impl CdDevice {
     /// Create a `CdDevice` from a found drive without opening it yet.
-    pub fn from_drive(drive: CdDrive) -> Self {
+    pub fn from_drive(mut drive: CdDrive) -> Self {
         let paranoia = std::ptr::null_mut();
+        let drive_ptr = drive.drive;
+        drive.drive = std::ptr::null_mut(); // Prevent Drop from closing it
         Self {
-            drive: drive.drive,
+            drive: drive_ptr,
             paranoia,
             is_open: false,
         }
@@ -130,7 +143,10 @@ impl CdDevice {
 impl Drop for CdDevice {
     fn drop(&mut self) {
         unsafe {
-            cdio_paranoia_free(self.paranoia);
+            // Only free paranoia if it was successfully initialized.
+            if !self.paranoia.is_null() {
+                cdio_paranoia_free(self.paranoia);
+            }
             cdio_cddap_close(self.drive);
         }
     }
