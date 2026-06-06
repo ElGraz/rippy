@@ -1,11 +1,11 @@
-use super::colors::{BOLD, RESET};
 use anyhow::Result;
+use owo_colors::OwoColorize;
 use std::io::{self, Write};
 
 /// Core prompt function shared by all input helpers.
 /// Writes the formatted prompt to stdout and reads one line from stdin.
 pub fn read_line(prompt: &str) -> Result<String> {
-    print!("  {}{}{}", BOLD, prompt, RESET);
+    print!("  {}", prompt.bold());
     io::stdout().flush()?;
 
     let mut input = String::new();
