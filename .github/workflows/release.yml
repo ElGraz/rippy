@@ -21,12 +21,6 @@ jobs:
       - name: Install cross
         run: cargo install cross
       
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libcdio-dev libcdio-cdda-dev libcdio-paranoia-dev
-          sudo apt-get install -y libiso9660-dev libudf-dev
-
       - name: Build
         run: cross build --release --target ${{ matrix.target }}
 
