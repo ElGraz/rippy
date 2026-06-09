@@ -76,8 +76,7 @@ pub fn rip_and_encode_track(
             }
         }
 
-        let sector_raw_ptr =
-            unsafe { cdio_paranoia_read(device.paranoia_ptr(), Some(dummy_callback)) };
+        let sector_raw_ptr = unsafe { cdio_paranoia_read(device.paranoia_ptr(), Some(read_cb)) };
         if sector_raw_ptr.is_null() {
             return Err(anyhow!("Read error at sector {}.", current_sector));
         }
@@ -85,7 +84,12 @@ pub fn rip_and_encode_track(
         let sector_samples: &[i16] =
             unsafe { std::slice::from_raw_parts(sector_raw_ptr as *const i16, SAMPLES_PER_SECTOR) };
 
-        progress::print_progress(current_sector, start_sector, total_sectors);
+        progress::print_progress(
+            current_sector,
+            start_sector,
+            total_sectors,
+            "💿".to_string(),
+        );
 
         let i32_samples: Vec<i32> = sector_samples.iter().map(|&s| s as i32).collect();
         encoder
@@ -104,4 +108,4 @@ pub fn rip_and_encode_track(
     Ok(())
 }
 
-unsafe extern "C" fn dummy_callback(_sector: i64, _status: u32) {}
+unsafe extern "C" fn read_cb(_sector: i64, _status: u32) {}
