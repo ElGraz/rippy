@@ -98,8 +98,8 @@ pub fn fetch_album_metadata(disc_id: &str) -> Result<Vec<AlbumMetadata>> {
 
             // Identify media layout and find the exact medium matching our target disc_id
             let media_list = release.media.unwrap_or_default();
-            let disc_count = media_list.len() as u32;
 
+            let disc_count = media_list.len() as u32;
             let mut disc_number = 1;
             let mut target_medium = None;
 
@@ -114,21 +114,17 @@ pub fn fetch_album_metadata(disc_id: &str) -> Result<Vec<AlbumMetadata>> {
             }
 
             // Fallback to the first medium if structural links are loose
-            let active_medium = target_medium.or_else(|| media_list.first().cloned());
-            let media_format = active_medium
-                .as_ref()
-                .and_then(|m| m.format.as_ref())
-                .map(|f| format!("{:?}", f))
-                .unwrap_or_default();
+            let active_medium = target_medium
+                .or_else(|| media_list.first().cloned())
+                .unwrap();
 
+            let media_format = active_medium.format.unwrap_or_default();
             let mut tracks_vec = Vec::new();
-            if let Some(medium) = active_medium {
-                if let Some(tracks) = medium.tracks {
-                    for track in tracks {
-                        let track_title = track.title;
-                        let track_mbid = track.recording.map(|r| r.id).unwrap_or_default();
-                        tracks_vec.push((track_title, track_mbid));
-                    }
+            if let Some(tracks) = active_medium.tracks {
+                for track in tracks {
+                    let track_title = track.title;
+                    let track_mbid = track.recording.map(|r| r.id).unwrap_or_default();
+                    tracks_vec.push((track_title, track_mbid));
                 }
             }
 
