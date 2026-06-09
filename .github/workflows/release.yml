@@ -6,30 +6,26 @@ name: Handle Release
 
 jobs:
   build:
-    name: Build for ${{ matrix.target }}
+    name: Build Linux x86_64
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            name: linux-x86_64
-          - target: aarch64-unknown-linux-gnu
-            name: linux-aarch64
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install cross
-        run: cargo install cross
       
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcdio-dev libcdio-cdda-dev libcdio-paranoia-dev 
+          sudo apt-get install -y libiso9660-dev libudf-dev
+
       - name: Build
-        run: cross build --release --target ${{ matrix.target }}
+        run: cargo build --release
 
       - name: Prepare artifact
-        run: mv target/${{ matrix.target }}/release/rippy rippy-${{ matrix.name }}
+        run: mv target/release/rippy rippy-linux-x86_64
 
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          files: rippy-${{ matrix.name }}
+          files: rippy-linux-x86_64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
